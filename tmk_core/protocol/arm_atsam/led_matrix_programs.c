@@ -100,6 +100,12 @@ led_setup_t leds_rainbow_s[] = {
     { .end = 1 },
 };
 
+// blue, to be used with fade to off/black
+led_setup_t leds_fade[] = {
+  { .hs = 0, .he = 100, .rs = 0, .re = 0, .gs = 0, .ge = 0, .bs = 255, .be = 255, .ef = EF_NONE },
+  { .end = 1 },
+};
+
 //Add new LED animations here using one from above as example
 //The last entry must be { .end = 1 }
 //Add the new animation name to the list below following its format
@@ -115,6 +121,7 @@ void *led_setups[] = {
     leds_white,
     leds_white_with_red_stripe,
     leds_black_with_red_stripe,
+    leds_fade,
     leds_off
 };
 

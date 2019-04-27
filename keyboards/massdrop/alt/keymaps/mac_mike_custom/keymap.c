@@ -1,5 +1,7 @@
 #include QMK_KEYBOARD_H
 
+// MIKE TODO: study and continue with porting this:  https://www.bikuman.com/atomantium/qmk_firmware/commit/63e212c0b78be664785433c11cd728f15f50cd6a
+
 enum alt_keycodes {
     L_BRI = SAFE_RANGE, //LED Brightness Increase                                   //Working
     L_BRD,              //LED Brightness Decrease                                   //Working
@@ -25,6 +27,34 @@ enum alt_keycodes {
 #define TG_NKRO MAGIC_TOGGLE_NKRO //Toggle 6KRO / NKRO mode
 
 keymap_config_t keymap_config;
+
+static uint8_t led_boosts[ISSI3733_LED_COUNT] = {
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0
+};
+
+#define __ -1
+static const uint8_t KEY_TO_LED_MAP[MATRIX_ROWS][MATRIX_COLS] = {
+  { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14},
+  {15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29},
+  {30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, __, 42, 43},
+  {44, __, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57},
+  {58, 59, 60, __, __, __, 61, __, __, __, 62, 63, 64, 65, 66},
+};
+
+void maybe_fade_on_key_press(keyrecord_t *record);
+static void set_nearest_led_to_max(uint8_t col, uint8_t row);
+static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row);
+
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [0] = LAYOUT(
@@ -66,6 +96,8 @@ void matrix_scan_user(void) {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     static uint32_t key_timer;
+
+    maybe_fade_on_key_press(record);
 
     switch (keycode) {
         case L_BRI:
@@ -187,6 +219,29 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return true; //Process all other keycodes normally
     }
 }
+
+void maybe_fade_on_key_press(keyrecord_t *record) {
+  if (led_enabled && led_animation_id == 11 && record->event.pressed) {
+    keypos_t key = record->event.key;
+    set_nearest_led_to_max(key.col, key.row);
+    // TODO: set all other led_boosts values to one (or 5?) less that what it was
+  }
+}
+
+static void set_nearest_led_to_max(uint8_t col, uint8_t row) {
+  uint8_t led_index = map_key_position_to_led_index(col, row);
+  if (led_index >= 0 && led_index < ISSI3733_LED_COUNT) {
+    led_boosts[led_index] = 100;
+  }
+}
+
+static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row) {
+  if (row >= 0 && row < MATRIX_ROWS && col >= 0 && col < MATRIX_COLS) {
+    return KEY_TO_LED_MAP[row][col];
+  }
+  return -1;
+}
+
 
 led_instruction_t led_instructions[] = {
     //Please see ../default_md/keymap.c for examples
