@@ -26,9 +26,37 @@ enum alt_keycodes {
 
 #define TG_NKRO MAGIC_TOGGLE_NKRO //Toggle 6KRO / NKRO mode
 
+#define LED_BOOST_PEAK 100
+#define LED_BOOST_STEP_DOWN 5
+#define LED_BOOST_REFRESH_INTERVAL_IN_MS 40
+
+#define MIN_RGB 0x050008
+#define MIN_R (MIN_RGB >> 16 & 0xff)
+#define MIN_G (MIN_RGB >> 8 & 0xff)
+#define MIN_B (MIN_RGB & 0xff)
+
+#define MAX_RGB 0xc26eff
+#define MAX_R (MAX_RGB >> 16 & 0xff)
+#define MAX_G (MAX_RGB >> 8 & 0xff)
+#define MAX_B (MAX_RGB & 0xff)
+
+#define UNDERGLOW_RGB 0x4f002e
+#define UNDERGLOW_R (UNDERGLOW_RGB >> 16 & 0xff)
+#define UNDERGLOW_G (UNDERGLOW_RGB >> 8 & 0xff)
+#define UNDERGLOW_B (UNDERGLOW_RGB & 0xff)
+
+#define UNDERGLOW_SCAN_CODE 255
+
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+
+extern issi3733_led_t led_map[];
+
+static uint16_t last_boost_update_timer;
+static uint8_t led_cur_index = 0;
+
 keymap_config_t keymap_config;
 
-static uint8_t led_boosts[ISSI3733_LED_COUNT] = {
+static uint8_t led_boosts[] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -51,9 +79,13 @@ static const uint8_t KEY_TO_LED_MAP[MATRIX_ROWS][MATRIX_COLS] = {
   {58, 59, 60, __, __, __, 61, __, __, __, 62, 63, 64, 65, 66},
 };
 
-void maybe_fade_on_key_press(keyrecord_t *record);
-static void set_nearest_led_to_max(uint8_t col, uint8_t row);
+void maybe_do_fade_on_keypress(keyrecord_t *record);
+static void maybe_do_fade_step(void);
+static void store_nearest_led_to_max(uint8_t col, uint8_t row);
 static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row);
+static uint8_t calculate_new_color_component_value(uint8_t max, uint8_t min);
+static void update_led_cur_rgb_values(void);
+static void store_new_led_boosts(void);
 
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -84,10 +116,12 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 // Runs just one time when the keyboard initializes.
 void matrix_init_user(void) {
+  last_boost_update_timer = timer_read();
 };
 
 // Runs constantly in the background, in a loop.
 void matrix_scan_user(void) {
+  maybe_do_fade_step();
 };
 
 #define MODS_SHIFT  (get_mods() & MOD_BIT(KC_LSHIFT) || get_mods() & MOD_BIT(KC_RSHIFT))
@@ -97,7 +131,7 @@ void matrix_scan_user(void) {
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     static uint32_t key_timer;
 
-    maybe_fade_on_key_press(record);
+    maybe_do_fade_on_keypress(record);
 
     switch (keycode) {
         case L_BRI:
@@ -220,18 +254,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 }
 
-void maybe_fade_on_key_press(keyrecord_t *record) {
+void maybe_do_fade_on_keypress(keyrecord_t *record) {
   if (led_enabled && led_animation_id == 11 && record->event.pressed) {
     keypos_t key = record->event.key;
-    set_nearest_led_to_max(key.col, key.row);
+    store_nearest_led_to_max(key.col, key.row);
     // TODO: set all other led_boosts values to one (or 5?) less that what it was
   }
 }
 
-static void set_nearest_led_to_max(uint8_t col, uint8_t row) {
+static void maybe_do_fade_step(void) {
+  if (led_enabled && led_animation_id == 11 && (timer_elapsed(last_boost_update_timer) > LED_BOOST_REFRESH_INTERVAL_IN_MS)) {
+    last_boost_update_timer = timer_read();
+    led_cur_index = 0;
+    store_new_led_boosts();  // calculations
+    while (led_cur_index < ISSI3733_LED_COUNT) {
+      update_led_cur_rgb_values();  // instructions to the board/LEDs
+      led_cur_index++;
+    }
+  }
+}
+
+static void store_nearest_led_to_max(uint8_t col, uint8_t row) {
   uint8_t led_index = map_key_position_to_led_index(col, row);
   if (led_index >= 0 && led_index < ISSI3733_LED_COUNT) {
-    led_boosts[led_index] = 100;
+    led_boosts[led_index] = LED_BOOST_PEAK;
   }
 }
 
@@ -242,6 +288,28 @@ static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row) {
   return -1;
 }
 
+static void store_new_led_boosts(void) {
+  for (int i = 0; i < ISSI3733_LED_COUNT; i++) {
+    led_boosts[i] = (led_boosts[i] - LED_BOOST_STEP_DOWN == 0) ? 0 : led_boosts[i] - LED_BOOST_STEP_DOWN;
+  }
+}
+
+static void update_led_cur_rgb_values(void) {
+  if (led_map[led_cur_index].scan == UNDERGLOW_SCAN_CODE) {
+    *led_map[led_cur_index].rgb.r = UNDERGLOW_R;
+    *led_map[led_cur_index].rgb.g = UNDERGLOW_G;
+    *led_map[led_cur_index].rgb.b = UNDERGLOW_B;
+  } else {
+    *led_map[led_cur_index].rgb.r = calculate_new_color_component_value(MAX_R, MIN_R);
+    *led_map[led_cur_index].rgb.g = calculate_new_color_component_value(MAX_G, MIN_G);
+    *led_map[led_cur_index].rgb.b = calculate_new_color_component_value(MAX_B, MIN_B);
+  }
+}
+
+static uint8_t calculate_new_color_component_value(uint8_t max, uint8_t min) {
+  uint8_t current_boost = led_boosts[led_cur_index];
+  return (float)(max - min) * current_boost / LED_BOOST_PEAK + min;
+}
 
 led_instruction_t led_instructions[] = {
     //Please see ../default_md/keymap.c for examples
