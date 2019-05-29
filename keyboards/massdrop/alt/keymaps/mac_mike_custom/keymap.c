@@ -38,7 +38,7 @@ enum alt_keycodes {
 extern issi3733_led_t led_map[];
 
 static uint16_t last_boost_update_timer;
-static bool caps_lock_on = false;
+bool caps_lock_on = false;
 
 keymap_config_t keymap_config;
 
