@@ -38,7 +38,7 @@ enum alt_keycodes {
 extern issi3733_led_t led_map[];
 
 static uint16_t last_boost_update_timer;
-bool caps_lock_on = false;
+static bool caps_lock_on;
 
 keymap_config_t keymap_config;
 
@@ -95,6 +95,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 // Runs just one time when the keyboard initializes.
 void matrix_init_user(void) {
+  caps_lock_on = false;
   last_boost_update_timer = timer_read();
 };
 
