@@ -1,6 +1,8 @@
 #include QMK_KEYBOARD_H
+#include "config.h"
 
-// MIKE TODO: study and continue with porting this:  https://www.bikuman.com/atomantium/qmk_firmware/commit/63e212c0b78be664785433c11cd728f15f50cd6a
+// MIKE TODO: study and continue with porting this:
+// https://www.bikuman.com/atomantium/qmk_firmware/commit/63e212c0b78be664785433c11cd728f15f50cd6a
 
 enum alt_keycodes {
     L_BRI = SAFE_RANGE, //LED Brightness Increase                                   //Working
@@ -26,9 +28,10 @@ enum alt_keycodes {
 
 #define TG_NKRO MAGIC_TOGGLE_NKRO //Toggle 6KRO / NKRO mode
 
-#define LED_BOOST_PEAK 100
+#define LED_BOOST_PEAK 200
 #define LED_BOOST_STEP_DOWN 5
-#define LED_BOOST_REFRESH_INTERVAL_IN_MS 40
+#define LED_BOOST_REFRESH_INTERVAL_IN_MS 20
+#define ALT_KEYCAP_COUNT 66
 
 #define MIN_RGB 0x050008
 #define MIN_R (MIN_RGB >> 16 & 0xff)
@@ -52,7 +55,7 @@ enum alt_keycodes {
 extern issi3733_led_t led_map[];
 
 static uint16_t last_boost_update_timer;
-static uint8_t led_cur_index = 0;
+// static uint8_t led_cur_index = 0;
 
 keymap_config_t keymap_config;
 
@@ -63,11 +66,7 @@ static uint8_t led_boosts[] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0
+  0, 0, 0, 0, 0, 0
 };
 
 #define __ -1
@@ -80,12 +79,9 @@ static const uint8_t KEY_TO_LED_MAP[MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 void maybe_do_fade_on_keypress(keyrecord_t *record);
-static void maybe_do_fade_step(void);
-static void store_nearest_led_to_max(uint8_t col, uint8_t row);
 static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row);
-static uint8_t calculate_new_color_component_value(uint8_t max, uint8_t min);
-static void update_led_cur_rgb_values(void);
-static void store_new_led_boosts(void);
+static void update_all_leds(void);
+static void step_down_all_boosts(void);
 
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -121,7 +117,13 @@ void matrix_init_user(void) {
 
 // Runs constantly in the background, in a loop.
 void matrix_scan_user(void) {
-  maybe_do_fade_step();
+  if (led_enabled && led_animation_id == 11 && (timer_elapsed(last_boost_update_timer) > LED_BOOST_REFRESH_INTERVAL_IN_MS)) {
+    last_boost_update_timer = timer_read();
+    step_down_all_boosts();
+  }
+  if (led_enabled && led_animation_id == 11) {
+    update_all_leds();
+  }
 };
 
 #define MODS_SHIFT  (get_mods() & MOD_BIT(KC_LSHIFT) || get_mods() & MOD_BIT(KC_RSHIFT))
@@ -246,7 +248,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
         case LOCK_SCN:
                 if (record->event.pressed) {
-                    SEND_STRING(SS_DOWN(X_LALT) SS_DOWN(X_LCTRL) SS_TAP(X_Q));
+                    SEND_STRING(SS_DOWN(X_LGUI) SS_DOWN(X_LCTRL) SS_TAP(X_Q) SS_UP(X_LCTRL) SS_UP(X_LGUI));
                 }
                 return false;
         default:
@@ -255,29 +257,29 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 void maybe_do_fade_on_keypress(keyrecord_t *record) {
-  if (led_enabled && led_animation_id == 11 && record->event.pressed) {
+  if (record->event.pressed) {
     keypos_t key = record->event.key;
-    store_nearest_led_to_max(key.col, key.row);
-    // TODO: set all other led_boosts values to one (or 5?) less that what it was
-  }
-}
-
-static void maybe_do_fade_step(void) {
-  if (led_enabled && led_animation_id == 11 && (timer_elapsed(last_boost_update_timer) > LED_BOOST_REFRESH_INTERVAL_IN_MS)) {
-    last_boost_update_timer = timer_read();
-    led_cur_index = 0;
-    store_new_led_boosts();  // calculations
-    while (led_cur_index < ISSI3733_LED_COUNT) {
-      update_led_cur_rgb_values();  // instructions to the board/LEDs
-      led_cur_index++;
+    uint8_t led_index = map_key_position_to_led_index(key.col, key.row);
+    if (led_enabled && led_animation_id == 11 && led_index > -1) {
+      led_boosts[led_index] = LED_BOOST_PEAK;
+      *led_map[led_index].rgb.r = led_boosts[led_index];
+      *led_map[led_index].rgb.g = led_boosts[led_index];
+      *led_map[led_index].rgb.b = led_boosts[led_index];
     }
   }
 }
 
-static void store_nearest_led_to_max(uint8_t col, uint8_t row) {
-  uint8_t led_index = map_key_position_to_led_index(col, row);
-  if (led_index >= 0 && led_index < ISSI3733_LED_COUNT) {
-    led_boosts[led_index] = LED_BOOST_PEAK;
+static void step_down_all_boosts(void) {
+  for (int i = 0; i < ALT_KEYCAP_COUNT; i++) {
+    led_boosts[i] = (led_boosts[i] - LED_BOOST_STEP_DOWN < 0) ? 0 : led_boosts[i] - LED_BOOST_STEP_DOWN;
+  }
+}
+
+static void update_all_leds(void) {
+  for (int i = 0; i < ALT_KEYCAP_COUNT; i++) {
+    *led_map[i].rgb.r = led_boosts[i];
+    *led_map[i].rgb.g = led_boosts[i];
+    *led_map[i].rgb.b = led_boosts[i];
   }
 }
 
@@ -288,34 +290,11 @@ static uint8_t map_key_position_to_led_index(uint8_t col, uint8_t row) {
   return -1;
 }
 
-static void store_new_led_boosts(void) {
-  for (int i = 0; i < ISSI3733_LED_COUNT; i++) {
-    led_boosts[i] = (led_boosts[i] - LED_BOOST_STEP_DOWN == 0) ? 0 : led_boosts[i] - LED_BOOST_STEP_DOWN;
-  }
-}
-
-static void update_led_cur_rgb_values(void) {
-  if (led_map[led_cur_index].scan == UNDERGLOW_SCAN_CODE) {
-    *led_map[led_cur_index].rgb.r = UNDERGLOW_R;
-    *led_map[led_cur_index].rgb.g = UNDERGLOW_G;
-    *led_map[led_cur_index].rgb.b = UNDERGLOW_B;
-  } else {
-    *led_map[led_cur_index].rgb.r = calculate_new_color_component_value(MAX_R, MIN_R);
-    *led_map[led_cur_index].rgb.g = calculate_new_color_component_value(MAX_G, MIN_G);
-    *led_map[led_cur_index].rgb.b = calculate_new_color_component_value(MAX_B, MIN_B);
-  }
-}
-
-static uint8_t calculate_new_color_component_value(uint8_t max, uint8_t min) {
-  uint8_t current_boost = led_boosts[led_cur_index];
-  return (float)(max - min) * current_boost / LED_BOOST_PEAK + min;
-}
-
 led_instruction_t led_instructions[] = {
     //Please see ../default_md/keymap.c for examples
 
     //All LEDs use the user's selected pattern (this is the factory default)
-     { .flags = LED_FLAG_USE_ROTATE_PATTERN },
+    { .flags = LED_FLAG_USE_ROTATE_PATTERN },
 
     //end must be set to 1 to indicate end of instruction set
      { .end = 1 }

@@ -121,7 +121,6 @@ extern void *led_setups[];
 #define LED_FLAG_USE_RGB             0x10       //Use a specific RGB value (set r, g, b to desired output color values)
 #define LED_FLAG_USE_PATTERN         0x20       //Use a specific pattern ID (set pattern_id to desired output pattern)
 #define LED_FLAG_USE_ROTATE_PATTERN  0x40       //Use pattern the user has cycled to manually
-#define LED_FLAG_KEY_FADE            0x60       //Use pattern the user has cycled to manually
 
 typedef struct led_instruction_s {
     uint16_t flags; // Bitfield for LED instructions
