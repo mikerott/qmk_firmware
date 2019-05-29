@@ -33,29 +33,12 @@ enum alt_keycodes {
 #define LED_BOOST_REFRESH_INTERVAL_IN_MS 20
 #define ALT_KEYCAP_COUNT 66
 
-#define MIN_RGB 0x050008
-#define MIN_R (MIN_RGB >> 16 & 0xff)
-#define MIN_G (MIN_RGB >> 8 & 0xff)
-#define MIN_B (MIN_RGB & 0xff)
-
-#define MAX_RGB 0xc26eff
-#define MAX_R (MAX_RGB >> 16 & 0xff)
-#define MAX_G (MAX_RGB >> 8 & 0xff)
-#define MAX_B (MAX_RGB & 0xff)
-
-#define UNDERGLOW_RGB 0x4f002e
-#define UNDERGLOW_R (UNDERGLOW_RGB >> 16 & 0xff)
-#define UNDERGLOW_G (UNDERGLOW_RGB >> 8 & 0xff)
-#define UNDERGLOW_B (UNDERGLOW_RGB & 0xff)
-
-#define UNDERGLOW_SCAN_CODE 255
-
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 extern issi3733_led_t led_map[];
 
 static uint16_t last_boost_update_timer;
-// static uint8_t led_cur_index = 0;
+static bool caps_lock_on = false;
 
 keymap_config_t keymap_config;
 
@@ -247,10 +230,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         case LOCK_SCN:
-                if (record->event.pressed) {
-                    SEND_STRING(SS_DOWN(X_LGUI) SS_DOWN(X_LCTRL) SS_TAP(X_Q) SS_UP(X_LCTRL) SS_UP(X_LGUI));
-                }
-                return false;
+            if (record->event.pressed) {
+                SEND_STRING(SS_DOWN(X_LGUI) SS_DOWN(X_LCTRL) SS_TAP(X_Q) SS_UP(X_LCTRL) SS_UP(X_LGUI));
+            }
+            return false;
+        case KC_CAPS:
+            if (record->event.pressed) {
+                caps_lock_on = !caps_lock_on;
+            }
+            // fall through
         default:
             return true; //Process all other keycodes normally
     }
@@ -277,9 +265,15 @@ static void step_down_all_boosts(void) {
 
 static void update_all_leds(void) {
   for (int i = 0; i < ALT_KEYCAP_COUNT; i++) {
-    *led_map[i].rgb.r = led_boosts[i];
-    *led_map[i].rgb.g = led_boosts[i];
-    *led_map[i].rgb.b = led_boosts[i];
+    if (i == 30 && caps_lock_on) {
+      *led_map[i].rgb.r = LED_BOOST_PEAK;
+      *led_map[i].rgb.g = LED_BOOST_PEAK;
+      *led_map[i].rgb.b = LED_BOOST_PEAK;
+    } else {
+      *led_map[i].rgb.r = led_boosts[i];
+      *led_map[i].rgb.g = led_boosts[i];
+      *led_map[i].rgb.b = led_boosts[i];
+    }
   }
 }
 
