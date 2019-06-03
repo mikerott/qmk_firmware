@@ -101,11 +101,11 @@ void matrix_init_user(void) {
 
 // Runs constantly in the background, in a loop.
 void matrix_scan_user(void) {
-  if (led_enabled && led_animation_id == 11 && (timer_elapsed(last_boost_update_timer) > LED_BOOST_REFRESH_INTERVAL_IN_MS)) {
+  if (led_enabled && led_animation_id == 0 && (timer_elapsed(last_boost_update_timer) > LED_BOOST_REFRESH_INTERVAL_IN_MS)) {
     last_boost_update_timer = timer_read();
     step_down_all_boosts();
   }
-  if (led_enabled && led_animation_id == 11) {
+  if (led_enabled && led_animation_id == 0) {
     update_all_leds();
   }
 };
@@ -249,7 +249,7 @@ void maybe_do_fade_on_keypress(keyrecord_t *record) {
   if (record->event.pressed) {
     keypos_t key = record->event.key;
     uint8_t led_index = map_key_position_to_led_index(key.col, key.row);
-    if (led_enabled && led_animation_id == 11 && led_index > -1) {
+    if (led_enabled && led_animation_id == 0 && led_index > -1) {
       led_boosts[led_index] = LED_BOOST_PEAK;
       *led_map[led_index].rgb.r = led_boosts[led_index];
       *led_map[led_index].rgb.g = led_boosts[led_index];

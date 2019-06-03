@@ -111,6 +111,7 @@ led_setup_t leds_fade[] = {
 //Add the new animation name to the list below following its format
 
 void *led_setups[] = {
+    leds_fade,
     leds_off,
     leds_rainbow_s,
     leds_rainbow_ns,
@@ -121,8 +122,7 @@ void *led_setups[] = {
     leds_blue,
     leds_white,
     leds_white_with_red_stripe,
-    leds_black_with_red_stripe,
-    leds_fade
+    leds_black_with_red_stripe
 };
 
 const uint8_t led_setups_count = sizeof(led_setups) / sizeof(led_setups[0]);
