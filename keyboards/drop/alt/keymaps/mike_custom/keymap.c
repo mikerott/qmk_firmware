@@ -14,7 +14,8 @@
 // https://www.overclockersclub.com/reviews/cmk_qmk_via/8.htm
 
 enum my_keycodes {
-  LOCK_SCN = SAFE_RANGE, //Lock screen on a MacBook Pro
+  PLACEHOLDER = SAFE_RANGE,
+  LOCK_SCN                  //Lock screen on a MacBook Pro
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -26,7 +27,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_LCTL, KC_LALT, KC_LGUI,                            KC_SPC,                             KC_RALT, MO(1),   KC_LEFT, KC_DOWN, KC_RGHT
     ),
     [1] = LAYOUT_65_ansi_blocker(
-        KC_GRV,  KC_F1,   KC_F2,    KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  _______, KC_MUTE,
+        // KC_GRV,  KC_F1,   KC_F2,    KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  _______, KC_MUTE,
+        KC_GRV,  KC_BRID, KC_BRIU,  KC_MCTL, KC_LPAD, _______, _______, KC_MPRV, KC_MPLY, KC_MNXT, KC_MUTE, KC_VOLD, KC_VOLU, _______, KC_SLEP,
         _______, RM_TOGG, RM_VALU,  RM_SPDU, RM_HUEU, RM_SATU, _______, _______, _______, _______, KC_PSCR, KC_SCRL, KC_PAUS, _______, KC_VOLU, 
         _______, RM_NEXT, RM_VALD,  RM_SPDD, RM_HUED, RM_SATD, _______, _______, _______, _______, _______, _______,          _______, KC_VOLD,
         _______, RGB_M_P, RGB_M_TW, _______, _______, QK_BOOT, NK_TOGG, _______, _______, _______, _______, _______,          KC_PGUP, KC_END,
@@ -35,12 +37,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    static uint32_t key_timer;
-
     switch (keycode) {
         case LOCK_SCN:
             if (record->event.pressed) {
-                SEND_STRING(SS_DOWN(X_LGUI) SS_DOWN(X_LCTRL) SS_TAP(X_Q) SS_UP(X_LCTRL) SS_UP(X_LGUI));
+                SEND_STRING(SS_DOWN(X_LGUI) SS_DOWN(X_LCTL) SS_TAP(X_Q) SS_UP(X_LCTL) SS_UP(X_LGUI));
             }
             return false;
         default:
